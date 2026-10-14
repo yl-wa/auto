@@ -88,10 +88,8 @@ class SeatAutoBooker:
         self.un = os.environ["SCHOOL_ID"].strip()  # 学号
         print("使用用户：{}".format(self.un))
         self.pd = os.environ["PASSWORD"].strip()  # 密码
-        self.SCKey = None
-        try:
-            self.SCKey = os.environ["SCKEY"]
-        except KeyError:
+        self.SCKey = os.environ.get("SCKEY", "").strip()
+        if not self.SCKey:
             print("没有Server酱的key,将不会推送消息")
 
         chrome_options = Options()
@@ -247,21 +245,28 @@ class SeatAutoBooker:
     def wechatNotice(self, message, desp=None):
         logging.info('Sending WeChat notice')
 
-        if self.SCKey != '':
-            url = 'https://sctapi.ftqq.com/{0}.send'.format(self.SCKey)
-            data = {
-                'title': message,
-                desp: desp,
-            }
-            try:
-                r = requests.post(url, data=data)
-                if r.json()["data"]["error"] == 'SUCCESS':
-                    print("Server酱通知成功")
-                else:
-                    print("Server酱通知失败")
-            except Exception as e:
-                logging.exception(e)
-                print(e.__class__, "推送服务配置错误")
+        if not self.SCKey:
+            print("未配置SCKEY，跳过Server酱通知")
+            return False
+
+        url = 'https://sctapi.ftqq.com/{0}.send'.format(self.SCKey)
+        data = {
+            'title': message,
+            'desp': desp or '',
+        }
+        try:
+            response = requests.post(url, data=data, timeout=15)
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("code") == 0 or payload.get("data", {}).get("error") == 'SUCCESS':
+                print("Server酱通知成功")
+                return True
+            print("Server酱通知失败：{}".format(payload.get("message", payload)))
+        except Exception as e:
+            logging.exception(e)
+            print(e.__class__, "推送服务配置错误")
+        return False
+
 
 if __name__ == "__main__":
     logging.info('Start of the program')
@@ -285,15 +290,27 @@ if __name__ == "__main__":
 
     s = SeatAutoBooker(basic_config["SeatAutoBooker"])
     if not s.login() == 0:
+        s.wechatNotice(
+            "HDU 座位预约失败",
+            "登录杭电系统失败，请检查 SCHOOL_ID、PASSWORD 或登录页面是否发生变化。"
+        )
         s.driver.quit()
         logging.info('Login unsuccessful')
         exit(-1)
     if not s.get_user_info() == 0:
+        s.wechatNotice(
+            "HDU 座位预约失败",
+            "已登录，但读取图书馆账户信息失败，请查看 GitHub Actions 日志。"
+        )
         s.driver.quit()
         logging.info('Getting user info unsuccessful')
         exit(-1)
     results = s.book_favorite_seat(user_config=user_config, seat_config=seat_config)
+    booking_date = (datetime.now() + timedelta(days=BOOK_DAYS_AHEAD)).strftime("%Y-%m-%d")
+    notice_lines = ["预约日期：{}".format(booking_date)]
     for slot, code, message in results:
         print("预约结果[{}]: {} {}".format(slot, code, message))
+        notice_lines.append("- {}：{}（代码 {}）".format(slot, message, code))
+    s.wechatNotice("HDU 座位预约结果", "\n".join(notice_lines))
     s.driver.quit()
     logging.info('End of the program')
