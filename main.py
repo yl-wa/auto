@@ -23,7 +23,7 @@ logging.basicConfig(
                     level=logging.INFO)
 
 WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-BOOK_DAYS_AHEAD = 2  # 预约后天
+BOOK_DAYS_AHEAD = 1  # 预约明天
 ALREADY_BOOKED_KEYS = ("已有预约", "重复预约", "请先取消", "当前已有", "只能预约一个", "已存在预约")
 SEAT_TAKEN_KEYS = ("已被", "占用", "不可用", "不存在", "冲突")
 
@@ -314,3 +314,4 @@ if __name__ == "__main__":
     s.wechatNotice("HDU 座位预约结果", "\n".join(notice_lines))
     s.driver.quit()
     logging.info('End of the program')
+
