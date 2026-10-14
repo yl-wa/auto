@@ -3,8 +3,8 @@ name: HDU Auto Book
 on:
   workflow_dispatch:
   schedule:
-    - cron: '27 12 * * *'
-    - cron: '57 12 * * *'
+    - cron: '3 12 * * *'
+    - cron: '13 12 * * *'
 
 jobs:
   bot:
@@ -12,33 +12,33 @@ jobs:
     env:
       TZ: Asia/Shanghai
     steps:
-      - name: Checkout codes
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.12
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Install ChromeDriver
-        run: |
-          CHROME_VERSION=$(google-chrome --version | cut -f 3 -d ' ' | cut -d '.' -f 1)
-          echo "Chrome version is ${CHROME_VERSION}"
-          DRIVER_URL=$(curl -s 'https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json' | jq -r --arg version $CHROME_VERSION '.versions[] | select(.version | startswith($version)) | .downloads.chromedriver[] | select(.platform == "linux64") | .url' | tail -1)
-          curl --silent --show-error --location --fail --retry 3 --output /tmp/chromedriver_linux64.zip $DRIVER_URL
-          cd /tmp 
-          unzip chromedriver_linux64.zip 
-          rm -rf chromedriver_linux64.zip 
-          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver 
-          sudo chmod +x /usr/local/bin/chromedriver 
-          chromedriver --version
-          sudo apt-get update -qq
-          sudo apt-get install -y xvfb
-      - name: Auto Book
-        env:
-          SCHOOL_ID: ${{ secrets.SCHOOL_ID }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-          SCKEY: ${{ secrets.SCKEY }}
-        run: xvfb-run -a python main.py
+    - name: Checkout codes
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.12
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Install ChromeDriver
+      run: |
+        CHROME_VERSION=$(google-chrome --version | cut -f 3 -d ' ' | cut -d '.' -f 1)
+        echo "Chrome version is ${CHROME_VERSION}"
+        DRIVER_URL=$(curl -s 'https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json' | jq -r --arg version $CHROME_VERSION '.versions[] | select(.version | startswith($version)) | .downloads.chromedriver[] | select(.platform == "linux64") | .url' | tail -1)
+        curl --silent --show-error --location --fail --retry 3 --output /tmp/chromedriver_linux64.zip $DRIVER_URL
+        cd /tmp
+        unzip chromedriver_linux64.zip
+        rm -rf chromedriver_linux64.zip
+        sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+        chromedriver --version
+        sudo apt-get update -qq
+        sudo apt-get install -y xvfb
+    - name: Auto Book
+      env:
+        SCHOOL_ID: ${{ secrets.SCHOOL_ID }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+        SCKEY: ${{ secrets.SCKEY }}
+      run: xvfb-run -a python main.py
