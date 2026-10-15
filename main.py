@@ -2,6 +2,7 @@ import requests
 import yaml
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json
 import os
 import logging
@@ -23,13 +24,25 @@ logging.basicConfig(
                     level=logging.INFO)
 
 WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-BOOK_DAYS_AHEAD = 1  # 预约明天
+BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+BOOKING_RELEASE_HOUR = 20
 ALREADY_BOOKED_KEYS = ("已有预约", "重复预约", "请先取消", "当前已有", "只能预约一个", "已存在预约")
 SEAT_TAKEN_KEYS = ("已被", "占用", "不可用", "不存在", "冲突")
 
 
+def target_booking_date(now=None):
+    """返回当前开放预约周期对应的日期。
+
+    图书馆每天 20:00 开放下一天：20:00 后预约明天；如果 GitHub Actions
+    延迟到午夜后执行，则继续预约当天，避免错误跳到后天。
+    """
+    current = now or datetime.now(BEIJING_TZ)
+    days_ahead = 1 if current.hour >= BOOKING_RELEASE_HOUR else 0
+    return (current + timedelta(days=days_ahead)).date()
+
+
 def target_weekday_name():
-    return WEEKDAYS[(datetime.now().weekday() + BOOK_DAYS_AHEAD) % 7]
+    return WEEKDAYS[target_booking_date().weekday()]
 
 
 def is_booking_enable(date_cfg):
@@ -150,8 +163,7 @@ class SeatAutoBooker:
         logging.info('Entering _book_favorite_seat method')
         date_config = user_config[target_weekday_name()]
         seats = get_seats_with_config(user_config, date_config, seat_config)
-        today_0_clock = datetime.strptime(datetime.now().strftime("%Y-%m-%d 00:00:00"), "%Y-%m-%d %H:%M:%S")
-        book_time = today_0_clock + timedelta(days=BOOK_DAYS_AHEAD) + timedelta(hours=start)
+        book_time = datetime.combine(target_booking_date(), datetime.min.time()) + timedelta(hours=start)
         delta = book_time - self.cfg["start-time"]
         total_seconds = delta.days * 24 * 3600 + delta.seconds
         # 第一轮优先沿用上一时段约到的座位，被占后再随机换
@@ -306,7 +318,7 @@ if __name__ == "__main__":
         logging.info('Getting user info unsuccessful')
         exit(-1)
     results = s.book_favorite_seat(user_config=user_config, seat_config=seat_config)
-    booking_date = (datetime.now() + timedelta(days=BOOK_DAYS_AHEAD)).strftime("%Y-%m-%d")
+    booking_date = target_booking_date().isoformat()
     notice_lines = ["预约日期：{}".format(booking_date)]
     for slot, code, message in results:
         print("预约结果[{}]: {} {}".format(slot, code, message))
@@ -314,4 +326,3 @@ if __name__ == "__main__":
     s.wechatNotice("HDU 座位预约结果", "\n".join(notice_lines))
     s.driver.quit()
     logging.info('End of the program')
-
